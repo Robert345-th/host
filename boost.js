@@ -20,6 +20,26 @@ async function ensureBoostSchema() {
   `);
 }
 
+router.get('/payee', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT name, phone FROM users
+       WHERE is_admin = true
+         AND (is_deleted = false OR is_deleted IS NULL)
+       ORDER BY id ASC
+       LIMIT 1`
+    );
+    res.json({
+      name: result.rows[0]?.name || 'Robert Zulu',
+      phone: result.rows[0]?.phone || '0978012009',
+      amount: 50,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not load payment details.' });
+  }
+});
+
 router.get('/my-credits', requireAuth, async (req, res) => {
   try {
     await ensureBoostSchema();
@@ -70,6 +90,13 @@ router.post('/:serviceId', requireAuth, async (req, res) => {
       return res.status(201).json({ success: true, usedCredit: true, boosted_until: boostedUntil });
     }
 
+    const ref = String(transaction_ref || '').trim();
+    if (ref.length < 6) {
+      return res.status(400).json({
+        error: 'Paste the Airtel or MTN confirmation SMS (or the transaction ID) after you send K50.',
+      });
+    }
+
     const existing = await pool.query(
       `SELECT 1 FROM boost_requests WHERE service_id = $1 AND status = 'pending'`,
       [req.params.serviceId]
@@ -81,7 +108,7 @@ router.post('/:serviceId', requireAuth, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO boost_requests (service_id, user_id, transaction_ref)
        VALUES ($1, $2, $3) RETURNING *`,
-      [req.params.serviceId, req.userId, transaction_ref || null]
+      [req.params.serviceId, req.userId, ref]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

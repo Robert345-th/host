@@ -7,6 +7,47 @@ const { sendPushNotification } = require('./notifications');
 const { notifyShopFollowers } = require('./follows');
 const { notifySavedSearches } = require('./saved-searches');
 
+// GET - public: admin account to open as support chat
+router.get('/support-contact', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name FROM users
+       WHERE is_admin = true
+         AND (is_deleted = false OR is_deleted IS NULL)
+       ORDER BY id ASC
+       LIMIT 1`
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No support contact available.' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not load support contact.' });
+  }
+});
+
+// GET - public: Airtel / MTN payee for boosts
+router.get('/payment-details', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT name, phone FROM users
+       WHERE is_admin = true
+         AND (is_deleted = false OR is_deleted IS NULL)
+       ORDER BY id ASC
+       LIMIT 1`
+    );
+    res.json({
+      name: result.rows[0]?.name || 'Robert Zulu',
+      phone: result.rows[0]?.phone || '0978012009',
+      amount: 50,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not load payment details.' });
+  }
+});
+
 // GET - list all users
 router.get('/users', requireAuth, requireAdmin, async (req, res) => {
   try {

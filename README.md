@@ -21,8 +21,11 @@ Default port is 3000.
 - `GET /reviews/leaderboard` — top vendors
 - `GET|POST|DELETE /follows/:shopId` — follow a shop
 - `GET /insights` — vendor views, chats, saves, followers
-- `POST /boost/:serviceId` — use a credit or request a 24h boost
+- `GET /boost/payee` — Airtel / MTN number for a K50 boost
+- `POST /boost/:serviceId` — use a credit, or send a payment SMS for admin review
 - `GET /boost/pending` — admin boost queue
+- `GET /admin/support-contact` — open a support chat
+- `POST /notifications/test-self` — test ping
 - `GET|POST /saved-searches` — notify me of new matches
 - `GET|PUT /auth/vendor-profile` — shop name, photo, bio
 - `POST /user-reports` — report a user
