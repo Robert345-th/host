@@ -155,8 +155,14 @@ async function ensureConfiguredAdmin() {
   }
 }
 
+const { seedSampleServices } = require('./seed-sample-services');
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  ensureConfiguredAdmin();
+  ensureConfiguredAdmin()
+    .then(() => seedSampleServices())
+    .catch((err) => {
+      console.error('Startup seed failed:', err);
+    });
 });
