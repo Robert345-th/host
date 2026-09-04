@@ -117,6 +117,29 @@ function phoneDigits(phone) {
   return String(phone || '').replace(/\D/g, '');
 }
 
+function phoneDigitVariants(phone) {
+  let d = phoneDigits(phone);
+  if (d.startsWith('260') && d.length >= 12) d = '0' + d.slice(3);
+  if (d.length === 9) d = '0' + d;
+  const local = d;
+  const nine = local.startsWith('0') ? local.slice(1) : local;
+  return [...new Set([local, nine, '260' + nine, phoneDigits(phone)].filter(Boolean))];
+}
+
+async function findUserByPhone(phone) {
+  const normalized = normalizePhoneInput(phone);
+  const variants = phoneDigitVariants(phone);
+  const result = await pool.query(
+    `SELECT * FROM users
+     WHERE phone = $1
+        OR phone = $2
+        OR regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = ANY($3::text[])
+     LIMIT 1`,
+    [normalized, phone, variants]
+  );
+  return result.rows[0] || null;
+}
+
 function isAdminPhone(phone) {
   const d = phoneDigits(phone);
   return d === '0978012009' || d === '978012009' || d === '260978012009' || d.endsWith('978012009');
@@ -636,12 +659,10 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    const result = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
-    if (result.rows.length === 0) {
+    const user = await findUserByPhone(phone);
+    if (!user) {
       return res.status(400).json({ error: 'Phone number or password is incorrect.' });
     }
-
-    const user = result.rows[0];
 
     if (user.is_deleted) {
       return res.status(400).json({ error: 'Phone number or password is incorrect.' });

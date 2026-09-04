@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const cron = require('node-cron');
+const bcrypt = require('bcrypt');
 const pool = require('./db');
 const { sendPushNotification } = require('./notifications');
 
@@ -102,22 +103,53 @@ async function sendDailyDigests() {
 cron.schedule('0 18 * * *', sendDailyDigests);
 
 async function ensureConfiguredAdmin() {
+  const adminPhone = '0978012009';
+  const adminPass = adminPhone;
   try {
-    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT');
-    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT');
   } catch (err) {
     console.error('Could not ensure email columns:', err);
   }
   try {
-    const result = await pool.query(
-      `UPDATE users SET is_admin = true
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT');
+    const found = await pool.query(
+      `SELECT id, phone FROM users
        WHERE regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g')
              IN ('0978012009', '978012009', '260978012009')
-       RETURNING id, phone`
+       ORDER BY CASE WHEN is_deleted IS TRUE THEN 1 ELSE 0 END, id
+       LIMIT 1`
     );
-    if (result.rows.length > 0) {
-      console.log(`Admin access enabled for ${result.rows[0].phone}.`);
+    const passwordHash = await bcrypt.hash(adminPass, 10);
+    if (found.rows.length > 0) {
+      await pool.query(
+        `UPDATE users
+         SET is_admin = true,
+             phone = $1,
+             phone_verified = true,
+             is_deleted = false,
+             deleted_at = NULL,
+             password_hash = $2
+         WHERE id = $3`,
+        [adminPhone, passwordHash, found.rows[0].id]
+      );
+      console.log(`Admin access ready for ${adminPhone}.`);
+      return;
     }
+    const referralCode = 'A' + Date.now().toString(36).slice(-6).toUpperCase();
+    await pool.query(
+      `INSERT INTO users (name, phone, password_hash, phone_verified, is_admin, referral_code)
+       VALUES ($1, $2, $3, true, true, $4)`,
+      ['Robert zulu', adminPhone, passwordHash, referralCode]
+    );
+    console.log(`Admin account created for ${adminPhone}.`);
   } catch (err) {
     console.error('Could not ensure admin user:', err);
   }
