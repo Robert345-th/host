@@ -46,6 +46,9 @@ app.use('/boost', boostRoutes);
 const { router: savedSearchesRoutes } = require('./saved-searches');
 app.use('/saved-searches', savedSearchesRoutes);
 
+const wantedRoutes = require('./wanted');
+app.use('/wanted', wantedRoutes);
+
 app.get('/', (req, res) => {
   res.send('ZedEvents server is running.');
 });

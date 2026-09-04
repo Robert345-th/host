@@ -27,5 +27,10 @@ Default port is 3000.
 - `GET /admin/support-contact` — open a support chat
 - `POST /notifications/test-self` — test ping
 - `GET|POST /saved-searches` — notify me of new matches
+- `GET /wanted` — open wanted-board posts
+- `GET /wanted/mine` — your wanted posts (auth)
+- `POST /wanted` — post what you need (auth)
+- `PUT /wanted/:id/close` — mark found (owner)
+- `DELETE /wanted/:id` — remove a post (owner)
 - `GET|PUT /auth/vendor-profile` — shop name, photo, bio
 - `POST /user-reports` — report a user
