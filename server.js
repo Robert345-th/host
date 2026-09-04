@@ -111,7 +111,8 @@ async function ensureConfiguredAdmin() {
   try {
     const result = await pool.query(
       `UPDATE users SET is_admin = true
-       WHERE phone = '0978012009' OR phone = '260978012009' OR phone = '+260978012009'
+       WHERE regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g')
+             IN ('0978012009', '978012009', '260978012009')
        RETURNING id, phone`
     );
     if (result.rows.length > 0) {

@@ -113,12 +113,13 @@ function publicUser(user) {
 
 const ADMIN_PHONE = '0978012009';
 
-function normalizeLocalPhone(phone) {
-  if (!phone) return '';
-  let p = String(phone).trim().replace(/[\s-]/g, '');
-  if (p.startsWith('+')) p = p.slice(1);
-  if (p.startsWith('260')) p = '0' + p.slice(3);
-  return p;
+function phoneDigits(phone) {
+  return String(phone || '').replace(/\D/g, '');
+}
+
+function isAdminPhone(phone) {
+  const d = phoneDigits(phone);
+  return d === '0978012009' || d === '978012009' || d === '260978012009' || d.endsWith('978012009');
 }
 
 /** Normalize any phone to a storage form (prefer E.164 without + for intl, keep 0… for ZM). */
@@ -142,10 +143,6 @@ function isValidPhoneInput(raw) {
   if (/^0(573\d{6}|574\d{6}|75\d{7}|77\d{7}|95\d{7}|97\d{7})$/.test(p)) return true;
   if (/^\+\d{8,15}$/.test(p)) return true;
   return false;
-}
-
-function isAdminPhone(phone) {
-  return normalizeLocalPhone(phone) === ADMIN_PHONE;
 }
 
 async function ensureAdminFlag(user) {
