@@ -34,6 +34,7 @@ async function ensureAuthSchema() {
   await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_city TEXT');
   await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS location_change_reason TEXT');
   await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS location_change_status TEXT');
+  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS free_featured_credits INTEGER DEFAULT 0');
   await pool.query(
     'CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_unique ON users (LOWER(email)) WHERE email IS NOT NULL'
   );
@@ -790,6 +791,7 @@ async function ensureVendorColumns() {
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS shop_location_label TEXT',
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS home_location_label TEXT',
     'ALTER TABLE users ADD COLUMN IF NOT EXISTS vendor_status TEXT',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS free_featured_credits INTEGER DEFAULT 0',
   ];
   for (const sql of statements) {
     await pool.query(sql);

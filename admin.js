@@ -4,6 +4,8 @@ const pool = require('./db');
 const requireAuth = require('./middleware');
 const requireAdmin = require('./requireAdmin');
 const { sendPushNotification } = require('./notifications');
+const { notifyShopFollowers } = require('./follows');
+const { notifySavedSearches } = require('./saved-searches');
 
 // GET - list all users
 router.get('/users', requireAuth, requireAdmin, async (req, res) => {
@@ -135,7 +137,13 @@ router.put('/services/:id/approve', requireAuth, requireAdmin, async (req, res) 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Pending service not found.' });
     }
-    res.json(result.rows[0]);
+    const service = result.rows[0];
+    const cat = await pool.query('SELECT name FROM categories WHERE id = $1', [service.category_id]);
+    const payload = { ...service, category: cat.rows[0]?.name || null };
+    notifyShopFollowers(service.vendor_id, payload);
+    notifySavedSearches(payload);
+    sendPushNotification(service.vendor_id, 'Service live', `"${service.title}" is now on ZedEvents.`);
+    res.json(service);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not approve service.' });

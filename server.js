@@ -34,6 +34,18 @@ app.use('/favorites', favoritesRoutes);
 const reviewsRoutes = require('./reviews');
 app.use('/reviews', reviewsRoutes);
 
+const { router: followsRoutes } = require('./follows');
+app.use('/follows', followsRoutes);
+
+const insightsRoutes = require('./insights');
+app.use('/insights', insightsRoutes);
+
+const boostRoutes = require('./boost');
+app.use('/boost', boostRoutes);
+
+const { router: savedSearchesRoutes } = require('./saved-searches');
+app.use('/saved-searches', savedSearchesRoutes);
+
 app.get('/', (req, res) => {
   res.send('ZedEvents server is running.');
 });

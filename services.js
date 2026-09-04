@@ -10,6 +10,8 @@ async function ensureServiceLocationColumns() {
   await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION');
   await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION');
   await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS location_label TEXT');
+  await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0');
+  await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS boosted_until TIMESTAMPTZ');
   locationColumnsReady = true;
 }
 
@@ -75,8 +77,10 @@ router.get('/', async (req, res) => {
     await ensureServiceLocationColumns();
     let query = `
       SELECT s.id, s.title, s.description, s.price, s.photos, s.date_posted, s.vendor_id,
-             s.latitude, s.longitude, s.location_label,
-             c.name AS category, u.name AS vendor_name, u.business_name, u.business_photo_url
+             s.latitude, s.longitude, s.location_label, s.view_count, s.boosted_until,
+             c.name AS category, u.name AS vendor_name, u.business_name, u.business_photo_url,
+             u.vendor_status,
+             (u.is_vendor = true AND u.vendor_status = 'approved') AS is_verified
       FROM services s
       LEFT JOIN categories c ON s.category_id = c.id
       LEFT JOIN users u ON s.vendor_id = u.id
@@ -90,7 +94,7 @@ router.get('/', async (req, res) => {
       query += ` AND s.category_id = $${params.length}`;
     }
 
-    query += ' ORDER BY s.date_posted DESC';
+    query += ` ORDER BY CASE WHEN s.boosted_until IS NOT NULL AND s.boosted_until > NOW() THEN 0 ELSE 1 END, s.date_posted DESC`;
 
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -105,7 +109,7 @@ router.get('/mine', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT s.id, s.title, s.description, s.price, s.photos, s.status, s.date_posted, s.category_id,
-              c.name AS category
+              s.view_count, s.boosted_until, c.name AS category
        FROM services s
        LEFT JOIN categories c ON s.category_id = c.id
        WHERE s.vendor_id = $1
@@ -125,9 +129,10 @@ router.get('/:id', async (req, res) => {
     await ensureServiceLocationColumns();
     const result = await pool.query(
       `SELECT s.id, s.title, s.description, s.price, s.photos, s.status, s.date_posted, s.category_id, s.vendor_id,
-              s.latitude, s.longitude, s.location_label,
+              s.latitude, s.longitude, s.location_label, s.view_count, s.boosted_until,
               c.name AS category, u.name AS vendor_name, u.phone AS vendor_phone,
-              u.business_name, u.business_bio, u.business_photo_url
+              u.business_name, u.business_bio, u.business_photo_url, u.vendor_status,
+              (u.is_vendor = true AND u.vendor_status = 'approved') AS is_verified
        FROM services s
        LEFT JOIN categories c ON s.category_id = c.id
        LEFT JOIN users u ON s.vendor_id = u.id
@@ -152,6 +157,23 @@ router.get('/:id', async (req, res) => {
       }
       if (Number(viewerId) !== Number(service.vendor_id)) {
         return res.status(404).json({ error: 'Service not found.' });
+      }
+    } else {
+      let viewerId = null;
+      const auth = req.headers.authorization;
+      if (auth && auth.startsWith('Bearer ')) {
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(auth.slice(7), process.env.JWT_SECRET);
+          viewerId = decoded.userId;
+        } catch { /* ignore */ }
+      }
+      if (Number(viewerId) !== Number(service.vendor_id)) {
+        await pool.query(
+          'UPDATE services SET view_count = COALESCE(view_count, 0) + 1 WHERE id = $1',
+          [service.id]
+        );
+        service.view_count = (service.view_count || 0) + 1;
       }
     }
 
