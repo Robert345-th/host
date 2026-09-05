@@ -49,6 +49,9 @@ app.use('/saved-searches', savedSearchesRoutes);
 const wantedRoutes = require('./wanted');
 app.use('/wanted', wantedRoutes);
 
+const bookingsRoutes = require('./bookings');
+app.use('/bookings', bookingsRoutes);
+
 app.get('/', (req, res) => {
   res.send('ZedEvents server is running.');
 });
