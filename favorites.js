@@ -3,6 +3,20 @@ const router = express.Router();
 const pool = require('./db');
 const requireAuth = require('./middleware');
 
+// GET - whether this service is saved
+router.get('/:serviceId/status', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT 1 FROM favorites WHERE user_id = $1 AND service_id = $2 LIMIT 1',
+      [req.userId, req.params.serviceId]
+    );
+    res.json({ saved: result.rows.length > 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not check favorite.' });
+  }
+});
+
 // GET - my favorited services
 router.get('/', requireAuth, async (req, res) => {
   try {
