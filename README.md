@@ -1,6 +1,6 @@
-# ZedEvents API
+# Host API
 
-Express + Postgres backend for ZedEvents.
+Express + Postgres backend for Host.
 
 Live: `https://zedevents-production.up.railway.app`
 

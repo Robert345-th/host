@@ -27,7 +27,7 @@ router.post('/test-self', requireAuth, async (req, res) => {
     if (!token) {
       return res.json({ sent: 0, has_token: false });
     }
-    await sendPushNotification(req.userId, 'ZedEvents', 'This is a test ping. Alerts are working.');
+    await sendPushNotification(req.userId, 'Host', 'This is a test ping. Alerts are working.');
     res.json({ sent: 1, has_token: true });
   } catch (err) {
     console.error(err);

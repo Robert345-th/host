@@ -434,7 +434,7 @@ router.post('/signup', async (req, res) => {
       try {
         await smsService.send({
           to: [intl],
-          message: `Your ZedEvents verification code is: ${otp}`,
+          message: `Your Host verification code is: ${otp}`,
         });
       } catch (smsErr) {
         console.error('SMS send failed:', smsErr);
@@ -520,7 +520,7 @@ router.post('/resend-otp', async (req, res) => {
     if (intl) {
       await smsService.send({
         to: [intl],
-        message: `Your ZedEvents verification code is: ${otp}`,
+        message: `Your Host verification code is: ${otp}`,
       });
     }
 
@@ -562,7 +562,7 @@ router.post('/forgot-password', async (req, res) => {
     if (intl) {
       await smsService.send({
         to: [intl],
-        message: `Your ZedEvents password reset code is: ${otp}`,
+        message: `Your Host password reset code is: ${otp}`,
       });
     }
 

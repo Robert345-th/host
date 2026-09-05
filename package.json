@@ -1,7 +1,7 @@
 {
   "name": "zedevents",
   "version": "1.0.0",
-  "description": "ZedEvents backend server",
+  "description": "Host backend server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

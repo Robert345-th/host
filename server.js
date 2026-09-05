@@ -53,7 +53,7 @@ const bookingsRoutes = require('./bookings');
 app.use('/bookings', bookingsRoutes);
 
 app.get('/', (req, res) => {
-  res.send('ZedEvents server is running.');
+  res.send('Host server is running.');
 });
 
 // Runs once a day — only notifies users who have favorited at least one service,
@@ -104,7 +104,7 @@ async function sendDailyDigests() {
       if (countResult.rows.length > 0 && parseInt(countResult.rows[0].count) > 0) {
         const topCategory = countResult.rows[0];
         const message = `🔔 ${topCategory.count} new ${topCategory.category} service${topCategory.count === '1' ? '' : 's'} posted today — check them out!`;
-        sendPushNotification(user.id, '📦 ZedEvents Digest', message);
+        sendPushNotification(user.id, '📦 Host Digest', message);
         sentCount++;
         await pool.query(`UPDATE users SET last_digest_sent = NOW() WHERE id = $1`, [user.id]);
       }

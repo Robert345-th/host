@@ -115,7 +115,7 @@ router.put('/vendor-applications/:id/approve', requireAuth, requireAdmin, async 
     sendPushNotification(
       req.params.id,
       'Shop Approved',
-      'Your ZedEvents vendor profile has been approved. You can now post services.'
+      'Your Host vendor profile has been approved. You can now post services.'
     );
     res.json({ success: true });
   } catch (err) {
@@ -183,7 +183,7 @@ router.put('/services/:id/approve', requireAuth, requireAdmin, async (req, res) 
     const payload = { ...service, category: cat.rows[0]?.name || null };
     notifyShopFollowers(service.vendor_id, payload);
     notifySavedSearches(payload);
-    sendPushNotification(service.vendor_id, 'Service live', `"${service.title}" is now on ZedEvents.`);
+    sendPushNotification(service.vendor_id, 'Service live', `"${service.title}" is now on Host.`);
     res.json(service);
   } catch (err) {
     console.error(err);
@@ -250,7 +250,7 @@ router.post('/broadcast', requireAuth, requireAdmin, async (req, res) => {
 
     for (const user of allUsersResult.rows) {
       if (user.push_token) {
-        sendPushNotification(user.id, title?.trim() || '📢 ZedEvents', message);
+        sendPushNotification(user.id, title?.trim() || '📢 Host', message);
       }
     }
 
