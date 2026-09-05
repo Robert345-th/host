@@ -1,5 +1,5 @@
 {
-  "name": "zedevents",
+  "name": "host",
   "version": "1.0.0",
   "description": "Host backend server",
   "main": "server.js",

@@ -2,12 +2,14 @@
 
 Express + Postgres backend for Host.
 
+Repo: https://github.com/Robert345-th/host  
 Live: `https://zedevents-production.up.railway.app`
 
 ## Run locally
 
 ```bash
-cd zedevents
+git clone https://github.com/Robert345-th/host.git
+cd host
 npm install
 # set DATABASE_URL (and other secrets) in .env
 npm start
