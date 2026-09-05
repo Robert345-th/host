@@ -33,8 +33,10 @@ Default port is 3000.
 - `PUT /wanted/:id/close` — mark found (owner)
 - `DELETE /wanted/:id` — remove a post (owner)
 - `GET /bookings` — your bookings as customer or vendor (auth)
-- `POST /bookings` — book a service (auth)
-- `PUT /bookings/:id/done` — mark a booking done
-- `PUT /bookings/:id/cancel` — cancel a booking
+- `POST /bookings` — request a booking (stays pending until the shop confirms)
+- `PUT /bookings/:id/confirm` — shop confirms
+- `PUT /bookings/:id/decline` — shop declines
+- `PUT /bookings/:id/done` — mark a confirmed booking done
+- `PUT /bookings/:id/cancel` — customer cancels a request or confirmed booking
 - `GET|PUT /auth/vendor-profile` — shop name, photo, bio
 - `POST /user-reports` — report a user

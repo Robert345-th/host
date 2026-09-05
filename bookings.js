@@ -17,10 +17,11 @@ async function ensureBookingsTable() {
           service_id INTEGER REFERENCES services(id) ON DELETE SET NULL,
           event_date TEXT,
           notes TEXT,
-          status TEXT NOT NULL DEFAULT 'booked',
+          status TEXT NOT NULL DEFAULT 'pending',
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `)
+      .then(() => pool.query(`ALTER TABLE bookings ALTER COLUMN status SET DEFAULT 'pending'`))
       .catch((err) => {
         tableReady = null;
         throw err;
@@ -48,7 +49,12 @@ router.get('/', requireAuth, async (req, res) => {
     const result = await pool.query(
       `${bookingSelect()}
        WHERE b.customer_id = $1 OR b.vendor_id = $1
-       ORDER BY CASE WHEN b.status = 'booked' THEN 0 WHEN b.status = 'done' THEN 1 ELSE 2 END,
+       ORDER BY CASE
+                  WHEN b.status = 'pending' THEN 0
+                  WHEN b.status = 'booked' THEN 1
+                  WHEN b.status = 'done' THEN 2
+                  ELSE 3
+                END,
                 b.created_at DESC`,
       [req.userId]
     );
@@ -96,18 +102,22 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     const existing = await pool.query(
-      `SELECT id FROM bookings
-       WHERE customer_id = $1 AND service_id = $2 AND status = 'booked'
+      `SELECT id, status FROM bookings
+       WHERE customer_id = $1 AND service_id = $2 AND status IN ('pending', 'booked')
        LIMIT 1`,
       [req.userId, serviceId]
     );
     if (existing.rows.length) {
-      return res.status(409).json({ error: 'You already booked this.', booking_id: existing.rows[0].id });
+      const already = existing.rows[0];
+      const message = already.status === 'pending'
+        ? 'You already asked to book this. Waiting for the shop to confirm.'
+        : 'You already booked this.';
+      return res.status(409).json({ error: message, booking_id: already.id, status: already.status });
     }
 
     const inserted = await pool.query(
-      `INSERT INTO bookings (customer_id, vendor_id, service_id, event_date, notes)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO bookings (customer_id, vendor_id, service_id, event_date, notes, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending')
        RETURNING id`,
       [req.userId, vendorId, serviceId, eventDate, notes]
     );
@@ -121,42 +131,119 @@ router.post('/', requireAuth, async (req, res) => {
     const customerName = row.customer_name || 'A customer';
     sendPushNotification(
       vendorId,
-      'New booking',
-      `${customerName} booked ${service.rows[0].title}`,
+      'Booking request',
+      `${customerName} wants to book ${service.rows[0].title}. Confirm it in Booked.`,
       { type: 'booking', bookingId: row.id, url: '/booked.html' }
     ).catch((err) => console.error('Booking push failed:', err.message));
 
     res.status(201).json(row);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Could not create booking.' });
+    res.status(500).json({ error: 'Could not send booking request.' });
   }
 });
 
-async function updateStatus(req, res, status) {
+async function loadBooking(id) {
+  const result = await pool.query('SELECT * FROM bookings WHERE id = $1', [id]);
+  return result.rows[0] || null;
+}
+
+function isParty(row, userId) {
+  return Number(row.customer_id) === Number(userId) || Number(row.vendor_id) === Number(userId);
+}
+
+router.put('/:id/confirm', requireAuth, async (req, res) => {
   try {
     await ensureBookingsTable();
-    const check = await pool.query(
-      'SELECT customer_id, vendor_id FROM bookings WHERE id = $1',
-      [req.params.id]
-    );
-    if (!check.rows.length) {
-      return res.status(404).json({ error: 'Booking not found.' });
+    const row = await loadBooking(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Booking not found.' });
+    if (Number(row.vendor_id) !== Number(req.userId)) {
+      return res.status(403).json({ error: 'Only the shop can confirm this booking.' });
     }
-    const row = check.rows[0];
-    if (Number(row.customer_id) !== Number(req.userId) && Number(row.vendor_id) !== Number(req.userId)) {
+    if (row.status !== 'pending') {
+      return res.status(400).json({ error: 'This booking is not waiting for confirmation.' });
+    }
+    await pool.query(`UPDATE bookings SET status = 'booked' WHERE id = $1`, [req.params.id]);
+    const title = (await pool.query('SELECT title FROM services WHERE id = $1', [row.service_id])).rows[0]?.title || 'your booking';
+    sendPushNotification(
+      row.customer_id,
+      'Booking confirmed',
+      `The shop confirmed ${title}.`,
+      { type: 'booking', bookingId: row.id, url: '/booked.html' }
+    ).catch((err) => console.error('Booking confirm push failed:', err.message));
+    res.json({ success: true, status: 'booked' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not confirm booking.' });
+  }
+});
+
+router.put('/:id/decline', requireAuth, async (req, res) => {
+  try {
+    await ensureBookingsTable();
+    const row = await loadBooking(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Booking not found.' });
+    if (Number(row.vendor_id) !== Number(req.userId)) {
+      return res.status(403).json({ error: 'Only the shop can decline this booking.' });
+    }
+    if (row.status !== 'pending') {
+      return res.status(400).json({ error: 'This booking is not waiting for confirmation.' });
+    }
+    await pool.query(`UPDATE bookings SET status = 'declined' WHERE id = $1`, [req.params.id]);
+    const title = (await pool.query('SELECT title FROM services WHERE id = $1', [row.service_id])).rows[0]?.title || 'your booking';
+    sendPushNotification(
+      row.customer_id,
+      'Booking declined',
+      `The shop declined ${title}.`,
+      { type: 'booking', bookingId: row.id, url: '/booked.html' }
+    ).catch((err) => console.error('Booking decline push failed:', err.message));
+    res.json({ success: true, status: 'declined' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not decline booking.' });
+  }
+});
+
+router.put('/:id/done', requireAuth, async (req, res) => {
+  try {
+    await ensureBookingsTable();
+    const row = await loadBooking(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Booking not found.' });
+    if (!isParty(row, req.userId)) {
       return res.status(403).json({ error: 'This is not your booking.' });
     }
-    await pool.query('UPDATE bookings SET status = $1 WHERE id = $2', [status, req.params.id]);
-    res.json({ success: true, status });
+    if (row.status !== 'booked') {
+      return res.status(400).json({ error: 'The shop must confirm this booking first.' });
+    }
+    await pool.query(`UPDATE bookings SET status = 'done' WHERE id = $1`, [req.params.id]);
+    res.json({ success: true, status: 'done' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not update booking.' });
   }
-}
+});
 
-router.put('/:id/done', requireAuth, (req, res) => updateStatus(req, res, 'done'));
-router.put('/:id/cancel', requireAuth, (req, res) => updateStatus(req, res, 'cancelled'));
+router.put('/:id/cancel', requireAuth, async (req, res) => {
+  try {
+    await ensureBookingsTable();
+    const row = await loadBooking(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Booking not found.' });
+    if (!isParty(row, req.userId)) {
+      return res.status(403).json({ error: 'This is not your booking.' });
+    }
+    if (row.status !== 'pending' && row.status !== 'booked') {
+      return res.status(400).json({ error: 'This booking cannot be cancelled.' });
+    }
+    if (row.status === 'pending' && Number(row.vendor_id) === Number(req.userId)) {
+      return res.status(400).json({ error: 'Decline the request instead of cancelling.' });
+    }
+    await pool.query(`UPDATE bookings SET status = 'cancelled' WHERE id = $1`, [req.params.id]);
+    res.json({ success: true, status: 'cancelled' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not cancel booking.' });
+  }
+});
 
 module.exports = router;
 module.exports.ensureBookingsTable = ensureBookingsTable;
