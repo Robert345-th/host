@@ -173,14 +173,14 @@ async function ensureConfiguredAdmin() {
   }
 }
 
-const { seedSampleServices } = require('./seed-sample-services');
+const { removeSampleData } = require('./seed-sample-services');
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   ensureConfiguredAdmin()
-    .then(() => seedSampleServices())
+    .then(() => removeSampleData())
     .catch((err) => {
-      console.error('Startup seed failed:', err);
+      console.error('Startup sample cleanup failed:', err);
     });
 });

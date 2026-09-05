@@ -901,4 +901,46 @@ async function seedSampleServices() {
   );
 }
 
-module.exports = { seedSampleServices };
+async function removeSampleData() {
+  await ensureColumns();
+
+  const existing = await pool.query(
+    `SELECT s.id
+     FROM services s
+     LEFT JOIN users u ON u.id = s.vendor_id
+     WHERE s.is_sample = true OR u.is_sample = true`
+  );
+  const serviceIds = existing.rows.map((row) => row.id);
+  if (serviceIds.length) {
+    await deleteSampleDeps(serviceIds);
+    await pool.query('DELETE FROM bookings WHERE service_id = ANY($1::int[])', [serviceIds]).catch(() => {});
+    await pool.query('DELETE FROM boost_requests WHERE service_id = ANY($1::int[])', [serviceIds]).catch(() => {});
+    await pool.query('DELETE FROM services WHERE id = ANY($1::int[])', [serviceIds]);
+  }
+
+  const sampleUsers = await pool.query('SELECT id, phone FROM users WHERE is_sample = true');
+  const userIds = sampleUsers.rows
+    .filter((row) => !isAdminPhone(row.phone))
+    .map((row) => row.id);
+  if (userIds.length) {
+    await pool.query(
+      'DELETE FROM shop_follows WHERE follower_id = ANY($1::int[]) OR shop_id = ANY($1::int[])',
+      [userIds]
+    ).catch(() => {});
+    await pool.query(
+      'DELETE FROM reviews WHERE vendor_id = ANY($1::int[]) OR reviewer_id = ANY($1::int[])',
+      [userIds]
+    ).catch(() => {});
+    await pool.query(
+      'DELETE FROM bookings WHERE customer_id = ANY($1::int[]) OR vendor_id = ANY($1::int[])',
+      [userIds]
+    ).catch(() => {});
+    await pool.query('DELETE FROM users WHERE id = ANY($1::int[])', [userIds]);
+  }
+
+  console.log(
+    `Removed fake sample data: ${serviceIds.length} listing(s), ${userIds.length} shop(s).`
+  );
+}
+
+module.exports = { seedSampleServices: removeSampleData, removeSampleData };

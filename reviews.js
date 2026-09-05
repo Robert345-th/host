@@ -7,9 +7,10 @@ const { sendPushNotification } = require('./notifications');
 // GET - top vendors by rating (must stay above /vendor/:id)
 router.get('/leaderboard', async (req, res) => {
   try {
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_sample BOOLEAN DEFAULT false');
     const result = await pool.query(
       `SELECT u.id, u.name, u.business_name, u.business_photo_url, u.vendor_status,
-              (u.is_vendor = true AND u.vendor_status = 'approved') AS is_verified,
+              (u.is_vendor = true AND u.vendor_status = 'approved' AND COALESCE(u.is_sample, false) = false) AS is_verified,
               ROUND(AVG(r.rating), 1) AS average,
               COUNT(*)::int AS total
        FROM reviews r
@@ -60,9 +61,10 @@ router.get('/vendor/:vendorId', async (req, res) => {
 // GET - full vendor public profile (name, business info, rating, trust badge)
 router.get('/vendor/:vendorId/profile', async (req, res) => {
   try {
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_sample BOOLEAN DEFAULT false');
     const userResult = await pool.query(
       `SELECT id, name, business_name, business_bio, business_photo_url, date_joined,
-              is_vendor, vendor_status
+              is_vendor, vendor_status, COALESCE(is_sample, false) AS is_sample
        FROM users WHERE id = $1`,
       [req.params.vendorId]
     );
@@ -72,7 +74,7 @@ router.get('/vendor/:vendorId/profile', async (req, res) => {
     }
 
     const vendor = userResult.rows[0];
-    const isVerified = vendor.is_vendor === true && vendor.vendor_status === 'approved';
+    const isVerified = vendor.is_vendor === true && vendor.vendor_status === 'approved' && vendor.is_sample !== true;
 
     const avgResult = await pool.query(
       `SELECT ROUND(AVG(rating), 1) AS average, COUNT(*) AS total FROM reviews WHERE vendor_id = $1`,

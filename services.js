@@ -12,6 +12,7 @@ async function ensureServiceLocationColumns() {
   await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS location_label TEXT');
   await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0');
   await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS boosted_until TIMESTAMPTZ');
+  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_sample BOOLEAN DEFAULT false');
   locationColumnsReady = true;
 }
 
@@ -80,7 +81,7 @@ router.get('/', async (req, res) => {
              s.latitude, s.longitude, s.location_label, s.view_count, s.boosted_until,
              c.name AS category, u.name AS vendor_name, u.business_name, u.business_photo_url,
              u.vendor_status,
-             (u.is_vendor = true AND u.vendor_status = 'approved') AS is_verified
+             (u.is_vendor = true AND u.vendor_status = 'approved' AND COALESCE(u.is_sample, false) = false) AS is_verified
       FROM services s
       LEFT JOIN categories c ON s.category_id = c.id
       LEFT JOIN users u ON s.vendor_id = u.id
@@ -132,7 +133,7 @@ router.get('/:id', async (req, res) => {
               s.latitude, s.longitude, s.location_label, s.view_count, s.boosted_until,
               c.name AS category, u.name AS vendor_name, u.phone AS vendor_phone,
               u.business_name, u.business_bio, u.business_photo_url, u.vendor_status,
-              (u.is_vendor = true AND u.vendor_status = 'approved') AS is_verified
+              (u.is_vendor = true AND u.vendor_status = 'approved' AND COALESCE(u.is_sample, false) = false) AS is_verified
        FROM services s
        LEFT JOIN categories c ON s.category_id = c.id
        LEFT JOIN users u ON s.vendor_id = u.id
